@@ -124,3 +124,6 @@ export class FluidClient {
     return await this.requestFeeBump(signedXdr, submit);
   }
 }
+
+export { FluidQueue } from "./queue";
+export type { QueuedTransaction, FluidQueueCallbacks } from "./queue";
