@@ -127,3 +127,12 @@ export class FluidClient {
 
 export { FluidQueue } from "./queue";
 export type { QueuedTransaction, FluidQueueCallbacks } from "./queue";
+export {
+  FluidClient,
+  type FeeBumpRequestBody,
+  type FeeBumpRequestInput,
+  type FeeBumpResponse,
+  type FluidClientConfig,
+  type XdrSerializableTransaction,
+} from "./FluidClient";
+export { useFeeBump, type UseFeeBumpResult } from "./hooks/useFeeBump";
