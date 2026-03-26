@@ -26,7 +26,7 @@ export async function feeBumpHandler (
   config: Config,
 ): Promise<void> {
   try {
-    const parsedBody = FeeBumpSchema.safeParse(req.body);
+    const result = FeeBumpSchema.safeParse(req.body);
 
     if (!result.success) {
       console.warn(
@@ -36,7 +36,7 @@ export async function feeBumpHandler (
 
       return next(
         new AppError(
-          `Validation failed: ${JSON.stringify(parsedBody.error.format())}`,
+          `Validation failed: ${JSON.stringify(result.error.format())}`,
           400,
           "INVALID_XDR",
         ),
@@ -44,6 +44,27 @@ export async function feeBumpHandler (
     }
 
     const body: FeeBumpRequest = result.data;
+
+    // Check against token whitelist if a token is provided
+    if (body.token) {
+      const isWhitelisted = config.supportedAssets.some((asset) => {
+        const assetId = asset.issuer ? `${asset.code}:${asset.issuer}` : asset.code;
+        return body.token === assetId;
+      });
+
+      if (!isWhitelisted) {
+        console.warn(`Rejected fee-bump request for non-whitelisted asset: ${body.token}`);
+        return next(
+          new AppError(
+            `Whitelisting failed: Asset "${body.token}" is not accepted for fee sponsorship.`,
+            400,
+            "UNSUPPORTED_ASSET",
+          ),
+        );
+      }
+      console.log(`Accepted whitelisted asset: ${body.token}`);
+    }
+
     const feePayerAccount = pickFeePayerAccount(config);
     console.log(
       `Received fee-bump request | fee_payer: ${feePayerAccount.publicKey}`,

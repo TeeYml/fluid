@@ -10,11 +10,13 @@ datasource db {
 }
 
 model Tenant {
-  id        String    @id @default(uuid())
-  name      String
-  apiKeys   ApiKey[]
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
+  id                    String                 @id @default(uuid())
+  name                  String
+  apiKeys               ApiKey[]
+  webhooks              WebhookDelivery[]
+  sponsoredTransactions SponsoredTransaction[]
+  createdAt             DateTime               @default(now())
+  updatedAt             DateTime               @updatedAt
 }
 
 model ApiKey {
@@ -26,7 +28,6 @@ model ApiKey {
   active    Boolean  @default(true)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-  webhooks  WebhookDelivery[]
 }
 
 model WebhookDelivery {
@@ -34,7 +35,7 @@ model WebhookDelivery {
   tenantId    String
   tenant      Tenant   @relation(fields: [tenantId], references: [id])
   url         String
-  payload     Json
+  payload     String
   status      String   @default("pending") // pending, success, failed
   retryCount  Int      @default(0)
   lastError   String?
@@ -44,4 +45,23 @@ model WebhookDelivery {
 
   @@index([status])
   @@index([tenantId])
+}
+
+model SupportedAsset {
+  id         String   @id @default(uuid())
+  code       String
+  issuer     String?
+  minBalance String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([code, issuer])
+}
+
+model SponsoredTransaction {
+  id         String   @id @default(uuid())
+  tenantId   String
+  tenant     Tenant   @relation(fields: [tenantId], references: [id])
+  feeStroops BigInt
+  createdAt  DateTime @default(now())
 }
