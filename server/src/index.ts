@@ -20,6 +20,10 @@ import {
   revokeApiKeyHandler,
   upsertApiKeyHandler,
 } from "./handlers/adminApiKeys";
+import {
+  listWebhookSettingsHandler,
+  updateWebhookSettingsHandler,
+} from "./handlers/adminWebhooks";
 import { feeBumpHandler } from "./handlers/feeBump";
 import { getHorizonFailoverClient } from "./horizon/failoverClient";
 import { apiKeyMiddleware } from "./middleware/apiKeys";
@@ -30,6 +34,10 @@ import {
 } from "./handlers/adminSigners";
 import { globalErrorHandler, notFoundHandler } from "./middleware/errorHandler";
 import { createCheckoutSessionHandler, stripeWebhookHandler } from "./handlers/stripe";
+import {
+  getWebhookSettingsHandler,
+  updateWebhookHandler,
+} from "./handlers/tenantWebhook";
 import { apiKeyRateLimit } from "./middleware/rateLimit";
 import { AlertService } from "./services/alertService";
 import { hydratePersistedSigners, listAdminSigners } from "./services/signerRegistry";
@@ -177,6 +185,22 @@ app.post(
   },
 );
 
+app.get(
+  "/tenant/webhook-settings",
+  apiKeyMiddleware,
+  (req: Request, res: Response, next: NextFunction) => {
+    void getWebhookSettingsHandler(req, res, next);
+  },
+);
+
+app.patch(
+  "/tenant/webhook-settings",
+  apiKeyMiddleware,
+  (req: Request, res: Response, next: NextFunction) => {
+    void updateWebhookHandler(req, res, next);
+  },
+);
+
 app.post("/test/add-transaction", (req: Request, res: Response) => {
   const { hash, status = "pending", tenantId = "test-tenant" } = req.body;
 
@@ -213,6 +237,8 @@ app.get("/admin/api-keys", listApiKeysHandler);
 app.post("/admin/api-keys", upsertApiKeyHandler);
 app.patch("/admin/api-keys/:key/revoke", revokeApiKeyHandler);
 app.delete("/admin/api-keys/:key", revokeApiKeyHandler);
+app.get("/admin/webhooks", listWebhookSettingsHandler);
+app.patch("/admin/webhooks/:tenantId", updateWebhookSettingsHandler);
 app.get("/admin/signers", listSignersHandler(config));
 app.post("/admin/signers", addSignerHandler(config));
 app.delete("/admin/signers/:publicKey", removeSignerHandler(config));
