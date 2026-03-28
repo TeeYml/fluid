@@ -244,6 +244,9 @@ export function DeveloperPortalLanding() {
             >
               Discord
             </a>
+            <Link href="/forum" className="text-sm font-medium text-primary hover:underline">
+              Community Forum
+            </Link>
           </nav>
         </div>
       </footer>
