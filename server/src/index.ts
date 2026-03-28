@@ -21,6 +21,7 @@ import {
   listSignersHandler,
   removeSignerHandler,
 } from "./handlers/adminSigners";
+import { getPriceHandler } from "./handlers/adminPrice";
 import {
   deleteDlqHandler,
   listDlqHandler,
@@ -254,6 +255,7 @@ app.patch("/admin/tenants/:tenantId/subscription-tier", updateTenantSubscription
 app.get("/admin/signers", listSignersHandler(config));
 app.post("/admin/signers", addSignerHandler(config));
 app.delete("/admin/signers/:publicKey", removeSignerHandler(config));
+app.get("/admin/prices", getPriceHandler);
 app.get("/admin/device-tokens", listDeviceTokensHandler);
 app.post("/admin/device-tokens", registerDeviceTokenHandler);
 app.delete("/admin/device-tokens/:id", deleteDeviceTokenHandler);

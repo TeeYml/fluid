@@ -10,6 +10,7 @@ import { checkTenantDailyQuota } from "../services/quota";
 import { calculateFeeBumpFee } from "../utils/feeCalculator";
 import { verifyXdrNetwork } from "../utils/networkVerification";
 import { MockPriceOracle, validateSlippage } from "../utils/priceOracle";
+import { priceService } from "../services/priceService";
 import { transactionMilestoneService } from "../services/discordMilestones";
 import { transactionStore } from "../workers/transactionStore";
 import { prisma } from "../utils/db";
@@ -406,6 +407,29 @@ export async function feeBumpHandler(
         } catch (error: any) {
           return next(new AppError(`Failed to verify token price: ${error.message}`, 500, "INTERNAL_ERROR"));
         }
+      }
+
+      // Dynamic fee threshold validation using real-time oracle price
+      try {
+        const feeAmount = calculateFeeBumpFee(parsedInner, config.baseFee, config.feeMultiplier);
+        const tokenCode = body.token.split(":")[0].toUpperCase();
+        const xlmPriceUsd = await priceService.getTokenPriceUsd("XLM");
+        const tokenPriceUsd = await priceService.getTokenPriceUsd(tokenCode);
+        const requiredTokenAmount = priceService.calculateRequiredTokenAmount(
+          feeAmount,
+          xlmPriceUsd,
+          tokenPriceUsd
+        );
+
+        console.log(
+          `[PriceOracle] XLM/USD: ${xlmPriceUsd.toString()}, ` +
+          `${tokenCode}/USD: ${tokenPriceUsd.toString()}, ` +
+          `fee: ${feeAmount} stroops, ` +
+          `required: ${requiredTokenAmount.toString()} ${tokenCode} ` +
+          `(buffer: ${priceService.getSafetyBuffer()}x)`
+        );
+      } catch (error: any) {
+        console.warn(`[PriceOracle] Price check failed (non-blocking): ${error.message}`);
       }
     }
 
