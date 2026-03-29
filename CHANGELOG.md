@@ -1,3 +1,10 @@
+# [1.15.0](https://github.com/Stellar-Fluid/fluid/compare/v1.14.0...v1.15.0) (2026-03-29)
+
+
+### Features
+
+* ai-generated audit log summaries ([8dde1f6](https://github.com/Stellar-Fluid/fluid/commit/8dde1f66fec42d1166d8f20a698fe09fc8622570))
+
 # [1.14.0](https://github.com/Stellar-Fluid/fluid/compare/v1.13.0...v1.14.0) (2026-03-29)
 
 
