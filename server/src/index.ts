@@ -1,6 +1,5 @@
 import "dotenv/config";
 
-import dotenv from "dotenv";
 import cors from "cors";
 import express, { NextFunction, Request, Response } from "express";
 import rateLimit from "express-rate-limit";
@@ -56,6 +55,7 @@ import {
 } from "./handlers/stripe";
 import { getHorizonFailoverClient } from "./horizon/failoverClient";
 import { apiKeyMiddleware } from "./middleware/apiKeys";
+import { soc2RequestLogger } from "./middleware/soc2Logger";
 import {
   createGlobalErrorHandler,
   notFoundHandler,
@@ -97,12 +97,18 @@ import {
 import { initializeFeeManager } from "./services/feeManager";
 import { initializeOFACScreening, stopOFACScreening } from "./services/ofacScreening";
 import { listTransactionsHandler } from "./handlers/adminTransactions";
+import {
+  listSARReportsHandler,
+  getSARReportHandler,
+  reviewSARReportHandler,
+  getSARStatsHandler,
+  exportSARReportsHandler
+} from "./handlers/adminSAR";
 import { getSpendForecastHandler } from "./handlers/adminAnalytics";
 import { getFeeMultiplierHandler } from "./handlers/adminFeeMultiplier";
 import { estimateFeeHandler } from "./handlers/estimate";
 import { exportAuditLogHandler } from "./handlers/adminAuditLog";
 import { ensureAuditLogTableIntegrity } from "./services/auditLogger";
-import swaggerUi from "swagger-ui-express";
 import { listAuditLogsHandler } from "./handlers/adminAuditLogs";
 import { startAuditSummaryWorker } from "./services/auditLog";
 import { swaggerSpec } from "./swagger";
@@ -112,8 +118,8 @@ import { transactionStore } from "./workers/transactionStore";
 import { TreasuryRebalancer } from "./services/treasuryRebalancer";
 import { dailyScoringWorker } from "./workers/dailyScoringWorker";
 import { crossChainSyncService } from "./services/crossChainSyncService";
+import { ipFilterMiddleware } from "./middleware/ipFilter";
 
-dotenv.config();
 const logger = createLogger({ component: "server" });
 const config = loadConfig();
 
@@ -151,7 +157,15 @@ const alertService = new AlertService(config.alerting, slackNotifier, {
 treasuryRebalancer.setAlertService(alertService);
 
 const app = express();
+
+// Respect X-Forwarded-For if running behind a proxy
+if (process.env.TRUST_PROXY === "true") {
+  app.set("trust proxy", true);
+}
+
+app.use(ipFilterMiddleware);
 app.use(express.json());
+app.use(soc2RequestLogger);
 
 // Use Redis-backed store for global IP rate limiting. Falls back to memory store if Redis unavailable.
 const windowSeconds = Math.max(1, Math.ceil(config.rateLimitWindowMs / 1000));
@@ -562,6 +576,23 @@ app.post(
     }
   },
 );
+
+// SAR (Suspicious Activity Report) routes — Phase 12: Compliance
+app.get("/admin/sar/stats", (req: Request, res: Response) => {
+  void getSARStatsHandler(req, res);
+});
+app.get("/admin/sar/export", (req: Request, res: Response) => {
+  void exportSARReportsHandler(req, res);
+});
+app.get("/admin/sar", (req: Request, res: Response) => {
+  void listSARReportsHandler(req, res);
+});
+app.get("/admin/sar/:id", (req: Request, res: Response) => {
+  void getSARReportHandler(req, res);
+});
+app.patch("/admin/sar/:id/review", (req: Request, res: Response) => {
+  void reviewSARReportHandler(req, res);
+});
 
 app.use(notFoundHandler);
 app.use(createGlobalErrorHandler(slackNotifier));

@@ -12,6 +12,7 @@ import { getFeeManager } from "../services/feeManager";
 import { FeeSponsor, SponsorResponse } from "./base";
 import { screenAddresses, logScreeningResult } from "../services/ofacScreening";
 import { extractAddresses } from "../utils/stellarAddressExtractor";
+import { evaluateSARRules } from "../services/sarService";
 
 export interface StellarSponsorParams {
   xdr: string;
@@ -115,7 +116,15 @@ export class StellarFeeSponsor implements FeeSponsor {
 
       feeBumpTx.sign(feePayerAccount.keypair);
       await recordSponsoredTransaction(tenant.id, Number(feeAmount));
-      
+
+      // Evaluate SAR rules synchronously during fee-bump (fire-and-forget to avoid blocking)
+      evaluateSARRules(
+        transactionRecord.id,
+        tenant.id,
+        Number(feeAmount),
+        category
+      ).catch(err => console.error("SAR evaluation error:", err));
+
       try {
         await transactionMilestoneService.checkForMilestones();
       } catch (error) {
