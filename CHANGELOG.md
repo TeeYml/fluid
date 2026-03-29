@@ -1,3 +1,10 @@
+# [1.17.0](https://github.com/Stellar-Fluid/fluid/compare/v1.16.0...v1.17.0) (2026-03-29)
+
+
+### Features
+
+* natural language query interface for transaction history ([3eb0894](https://github.com/Stellar-Fluid/fluid/commit/3eb0894412291f862c6518fca8a50cf8eadc5f71))
+
 # [1.16.0](https://github.com/Stellar-Fluid/fluid/compare/v1.15.0...v1.16.0) (2026-03-29)
 
 
