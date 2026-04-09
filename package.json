@@ -7,7 +7,6 @@
     "client",
     "client/examples/vue",
     "server",
-    "frontend",
     "admin-dashboard",
     "fluid-server/wasm-demo"
   ],
