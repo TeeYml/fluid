@@ -516,6 +516,7 @@ let incidentMonitor: ReturnType<typeof initializeIncidentMonitor> | null = null;
 let treasurySweeper: ReturnType<typeof initializeTreasurySweeper> | null = null;
 let digestWorker: ReturnType<typeof initializeDigestWorker> | null = null;
 let tenantErasureWorker: TenantErasureWorker | null = null;
+let treasuryRefillWorker: ReturnType<typeof initializeTreasuryRefill> | null = null;
 let shuttingDown = false;
 let server: ReturnType<typeof app.listen> | null = null;
 
@@ -525,37 +526,68 @@ async function shutdown(signal: string): Promise<void> {
   }
 
   shuttingDown = true;
+  logger.info(`Received ${signal}, starting graceful shutdown...`);
+
   await slackNotifier.notifyServerLifecycle({
     detail: `Signal received: ${signal}`,
     phase: "stop",
     timestamp: new Date(),
   });
 
-  ledgerMonitor?.stop();
-  balanceMonitor?.stop();
-  incidentMonitor?.stop();
-  digestWorker?.stop();
-  tenantErasureWorker?.stop();
-  feeManager.stop();
-  stopChainRegistryHotReload();
-  stopOFACScreening();
-  treasurySweeper?.stop();
+  const stopPromises = [
+    ledgerMonitor?.stop(),
+    balanceMonitor?.stop(),
+    incidentMonitor?.stop(),
+    digestWorker?.stop(),
+    tenantErasureWorker?.stop(),
+    treasuryRefillWorker?.stop(),
+    dailyScoringWorker.stop(),
+    // Keep these even if they are sync to stop everything
+    Promise.resolve(feeManager.stop()),
+    Promise.resolve(stopChainRegistryHotReload()),
+    Promise.resolve(stopOFACScreening()),
+    Promise.resolve(treasurySweeper?.stop()),
+  ];
+
+  try {
+    logger.info("Waiting for workers to finish current cycles...");
+    await Promise.race([
+      Promise.all(stopPromises),
+      new Promise((_, reject) =>
+        setTimeout(() => reject(new Error("Shutdown timeout exceeded")), 15000),
+      ),
+    ]);
+    logger.info("All workers stopped gracefully");
+  } catch (error) {
+    logger.error(
+      { ...serializeError(error) },
+      "Timeout or error during worker shutdown, proceeding to exit",
+    );
+  }
 
   if (server) {
-    server.close(() => process.exit(0));
-    setTimeout(() => process.exit(0), 2_000).unref();
+    server.close(() => {
+      logger.info("HTTP server closed");
+      process.exit(0);
+    });
+    setTimeout(() => {
+      logger.warn("HTTP server close timeout, forcing exit");
+      process.exit(0);
+    }, 5000).unref();
     return;
   }
 
   process.exit(0);
 }
 
+process.on("SIGTERM", () => void shutdown("SIGTERM"));
+process.on("SIGINT", () => void shutdown("SIGINT"));
+
 // --- Background Workers ---
-let ledgerMonitorInstance: any = null;
 if (config.horizonUrls.length > 0) {
   try {
-    ledgerMonitorInstance = initializeLedgerMonitor(config);
-    ledgerMonitorInstance.start();
+    ledgerMonitor = initializeLedgerMonitor(config);
+    ledgerMonitor.start();
     logger.info("Ledger monitor worker started");
   } catch (error) {
     logger.error(
@@ -609,9 +641,9 @@ if (pagerDutyNotifier.isConfigured() || fcmNotifier.isConfigured()) {
 }
 
 try {
-  const treasuryRefill = initializeTreasuryRefill(config);
-  if (treasuryRefill) {
-    treasuryRefill.start();
+  treasuryRefillWorker = initializeTreasuryRefill(config);
+  if (treasuryRefillWorker) {
+    treasuryRefillWorker.start();
     logger.info("Treasury refill worker started");
   }
 } catch (error) {
