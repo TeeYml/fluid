@@ -136,6 +136,11 @@ import {
   startChainRegistryHotReload,
   stopChainRegistryHotReload,
 } from "./services/chainRegistryService";
+import { createBullBoard } from "@bull-board/api";
+import { BullMQAdapter } from "@bull-board/api/bullMQAdapter";
+import { ExpressAdapter } from "@bull-board/express";
+import { feeBumpQueue, feeBumpQueueEvents } from "./queues/feeBumpQueue";
+import { initializeFeeBumpWorker } from "./workers/feeBumpWorker";
 
 const logger = createLogger({ component: "server" });
 const config = loadConfig();
@@ -362,6 +367,19 @@ app.post(
   },
 );
 
+// Bull Board — job queue admin UI
+const bullBoardAdapter = new ExpressAdapter();
+bullBoardAdapter.setBasePath("/admin/queues");
+createBullBoard({
+  queues: [new BullMQAdapter(feeBumpQueue)],
+  serverAdapter: bullBoardAdapter,
+});
+app.use(
+  "/admin/queues",
+  requireAuthenticatedAdmin(),
+  bullBoardAdapter.getRouter(),
+);
+
 app.post("/admin/auth/login", adminLoginHandler);
 app.post("/admin/auth/change-password", requireAuthenticatedAdmin(), changeAdminPasswordHandler);
 app.get("/admin/users", requirePermission("manage_users"), listAdminUsersHandler);
@@ -519,6 +537,7 @@ let incidentMonitor: ReturnType<typeof initializeIncidentMonitor> | null = null;
 let treasurySweeper: ReturnType<typeof initializeTreasurySweeper> | null = null;
 let digestWorker: ReturnType<typeof initializeDigestWorker> | null = null;
 let tenantErasureWorker: TenantErasureWorker | null = null;
+let feeBumpWorker: ReturnType<typeof initializeFeeBumpWorker> | null = null;
 let shuttingDown = false;
 let server: ReturnType<typeof app.listen> | null = null;
 
@@ -543,6 +562,9 @@ async function shutdown(signal: string): Promise<void> {
   stopChainRegistryHotReload();
   stopOFACScreening();
   treasurySweeper?.stop();
+  await feeBumpWorker?.close();
+  await feeBumpQueueEvents.close();
+  await feeBumpQueue.close();
 
   if (server) {
     server.close(() => process.exit(0));
@@ -698,6 +720,15 @@ try {
   logger.error(
     { ...serializeError(error) },
     "Failed to start treasury sweeper worker",
+  );
+}
+
+try {
+  feeBumpWorker = initializeFeeBumpWorker(config);
+} catch (error) {
+  logger.error(
+    { ...serializeError(error) },
+    "Failed to start fee-bump queue worker",
   );
 }
 
